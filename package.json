@@ -1,6 +1,6 @@
 {
   "name": "@elumixor/asset-viewer",
-  "version": "1.0.1",
+  "version": "0.0.1",
   "description": "A simple asset viewer for PixiJS and Three.js",
   "main": "dist/asset-viewer-server.js",
   "types": "dist/asset-viewer-server.d.ts",
@@ -15,9 +15,12 @@
     "asset-viewer": "dist/asset-viewer-server.js"
   },
   "scripts": {
-    "build": "bun run build:clean && bun run build:bundle && bun run build:shebang",
+    "build": "bun run build:clean && bun run build:client && bun run build:bundle && bun run build:declaration && bun run build:copy-client && bun run build:shebang",
     "build:clean": "rm -rf ./dist",
+    "build:client": "bun build ./src/client/viewer.ts --outdir ./dist/client --target browser --minify",
     "build:bundle": "bun build ./src/asset-viewer-server.ts --target node --outdir ./dist --minify",
+    "build:declaration": "tsc --project tsconfig.json",
+    "build:copy-client": "node ./scripts/copy-client.js",
     "build:shebang": "node ./scripts/add-shebang.js",
     "check": "tsc --noEmit && bun run lint",
     "lint": "biome check . --fix",
@@ -33,6 +36,9 @@
     "@types/bun": "^1.2.21",
     "@types/three": "^0.180.0",
     "typescript": "^5"
+  },
+  "dependencies": {
+    "commander": "^12.1.0"
   },
   "peerDependencies": {
     "pixi.js": "^8.13.2",

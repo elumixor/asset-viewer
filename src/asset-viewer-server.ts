@@ -1,4 +1,4 @@
-#!/usr/bin/env bun
+#!/usr/bin/env node
 
 /**
  * Single-command Asset Viewer Server
@@ -9,8 +9,11 @@
  */
 
 import { exec } from "node:child_process";
-import { readdir, stat } from "node:fs/promises";
-import { extname, join } from "node:path";
+import { readdir, stat, readFile } from "node:fs/promises";
+import { createReadStream, existsSync } from "node:fs";
+import { extname, join, resolve } from "node:path";
+import { createServer, IncomingMessage, ServerResponse } from "node:http";
+import { Command } from "commander";
 
 type AssetType = "model" | "texture";
 
@@ -21,11 +24,12 @@ interface AssetInfo {
   readonly path: string; // public URL path
 }
 
-const PORT = 5735; // pick a port unlikely to clash with Vite (5173)
-const HOST = "localhost";
-const ORIGIN = `http://${HOST}:${PORT}`;
-const PUBLIC_DIR: string = join(process.cwd(), "public");
-const ASSETS_DIR: string = join(PUBLIC_DIR, "assets");
+// Values will be injected after CLI parsing
+let PORT = 5735;
+let HOST = "localhost";
+let PUBLIC_DIR: string = join(process.cwd(), "public");
+let ASSETS_DIR: string = join(PUBLIC_DIR, "assets");
+let ORIGIN = `http://${HOST}:${PORT}`;
 const MODEL_EXTS: Set<string> = new Set([".glb", ".gltf"]);
 const TEXTURE_EXTS: Set<string> = new Set([".png", ".jpg", ".jpeg", ".webp"]);
 
@@ -53,8 +57,9 @@ async function collectAssets(): Promise<AssetInfo[]> {
     if (!type) continue;
     const filename = file.substring(file.lastIndexOf("/") + 1);
     const name = filename.replace(ext, "");
-    const rel = file.substring(PUBLIC_DIR.length).replace(/\\/g, "/");
-    assets.push({ name, filename, type, path: rel });
+    const relWithinAssets = file.substring(ASSETS_DIR.length).replace(/\\/g, "/");
+    const urlPath = `/assets${relWithinAssets}`; // always serve under /assets
+    assets.push({ name, filename, type, path: urlPath });
   }
   assets.sort((a, b) => a.filename.localeCompare(b.filename));
   return assets;
@@ -69,175 +74,114 @@ function openBrowser(url: string): void {
   });
 }
 
-function htmlPage(): string {
-  // Inline minimal viewer. Uses import map to resolve three from local node_modules (fallback to CDN if missing)
-  return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8" />
-  <title>HYPO Asset Grid Viewer</title>
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <script type="importmap">{ "imports": { "three": "/node_modules/three/build/three.module.js", "three/examples/jsm/loaders/GLTFLoader.js": "/node_modules/three/examples/jsm/loaders/GLTFLoader.js" } }</script>
-  <style>
-    *{box-sizing:border-box;margin:0;padding:0}body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,sans-serif;background:#0f1623;color:#fff;min-height:100vh;padding:18px;}
-    h1{font-size:1.8rem;margin-bottom:12px;background:linear-gradient(90deg,#4ec9ff,#6cf);-webkit-background-clip:text;color:transparent;font-weight:600}
-    .toolbar{display:flex;gap:12px;align-items:center;margin-bottom:18px;flex-wrap:wrap}
-    button{background:linear-gradient(45deg,#4ec9ff,#6cf);color:#062030;border:none;padding:8px 14px;border-radius:8px;font-weight:600;cursor:pointer}
-    button:disabled{opacity:.5;cursor:not-allowed}
-    #grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:16px}
-    .card{background:#152233;border:1px solid #223547;border-radius:12px;padding:10px;display:flex;flex-direction:column;gap:8px;position:relative;overflow:hidden}
-    .thumb{background:#111;border:1px solid #223547;border-radius:8px;display:flex;align-items:center;justify-content:center;aspect-ratio:1/1;position:relative;overflow:hidden}
-    canvas{width:100%;height:100%;display:block}
-    img{max-width:100%;max-height:100%;object-fit:contain;display:block}
-    .badge{position:absolute;top:6px;left:6px;background:#4ec9ff;color:#052030;font-size:10px;padding:3px 6px;border-radius:6px;font-weight:700;text-transform:uppercase;letter-spacing:.5px}
-    .name{font-size:.85rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#9cd6ff}
-    .meta{font-size:.65rem;opacity:.65;line-height:1.2;min-height:1em}
-    footer{margin-top:30px;font-size:.65rem;opacity:.5}
-    .spinner{width:22px;height:22px;border:3px solid #223547;border-top:3px solid #4ec9ff;border-radius:50%;animation:spin 1s linear infinite}
-    @keyframes spin{to{transform:rotate(360deg)}}
-    .loading-overlay{position:fixed;inset:0;background:#0f1623;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;font-size:.9rem;z-index:10}
-  </style></head><body>
-  <div class="loading-overlay" id="loading"><div class="spinner"></div><div>Scanning assets...</div></div>
-  <h1>HYPO Asset Viewer</h1>
-  <div class="toolbar"><button id="reloadBtn">Reload</button><span id="count"></span></div>
-  <div id="grid"></div>
-  <footer>Auto-generated viewer • Three.js CDN • HYPO dev tool</footer>
-  <script type="module">
-    // Attempt local import (served via /node_modules). If it fails, dynamically fall back to CDN.
-    let THREE;
-    let GLTFLoader;
-    try {
-      THREE = await import('three');
-      ({ GLTFLoader } = await import('three/examples/jsm/loaders/GLTFLoader.js'));
-    } catch (e) {
-      console.warn('Local three import failed, falling back to CDN', e);
-      THREE = await import('https://unpkg.com/three@0.168.0/build/three.module.js');
-      ({ GLTFLoader } = await import('https://unpkg.com/three@0.168.0/examples/jsm/loaders/GLTFLoader.js'));
-    }
-    const grid = document.getElementById('grid');
-    const countEl = document.getElementById('count');
-    const overlay = document.getElementById('loading');
-    document.getElementById('reloadBtn').onclick = load;
-    async function load(){
-      overlay.style.display='flex';
-      grid.innerHTML='';
-      const res = await fetch('/api/assets');
-      const assets = await res.json();
-      countEl.textContent = assets.length + ' assets';
-      for(const a of assets) addCard(a);
-      overlay.style.display='none';
-    }
-    function addCard(asset){
-      const card = document.createElement('div');
-      card.className='card';
-      const thumb = document.createElement('div');
-      thumb.className='thumb';
-      const badge = document.createElement('div');
-      badge.className='badge';
-      badge.textContent=asset.type;
-      thumb.appendChild(badge);
-      const name = document.createElement('div');
-      name.className='name';
-      name.textContent=asset.filename;
-      const meta = document.createElement('div');
-      meta.className='meta';
-      card.appendChild(thumb);card.appendChild(name);card.appendChild(meta);grid.appendChild(card);
-      if(asset.type==='texture'){
-        const img = new Image();
-        img.onload=()=>{meta.textContent=img.naturalWidth+'x'+img.naturalHeight;};
-        img.src=asset.path;thumb.appendChild(img);return;
-      }
-      // model preview
-      const canvas = document.createElement('canvas');
-      thumb.appendChild(canvas);
-      const scene = new THREE.Scene();
-      scene.background = new THREE.Color(0x0d141d);
-      const camera = new THREE.PerspectiveCamera(45,1,0.1,100);
-      camera.position.set(2.5,2,2.5);
-      const renderer = new THREE.WebGLRenderer({canvas,antialias:true});
-      renderer.setSize(256,256,false);
-      const amb = new THREE.AmbientLight(0xffffff,0.6);scene.add(amb);
-      const dir = new THREE.DirectionalLight(0xffffff,0.8);dir.position.set(5,6,4);scene.add(dir);
-      const gridHelper = new THREE.GridHelper(6,6,0x223547,0x152433);scene.add(gridHelper);
-      const loader = new GLTFLoader();
-      loader.load(asset.path,gltf=>{
-        const model = gltf.scene;
-        // center + scale
-        const box = new THREE.Box3().setFromObject(model);
-        const size = box.getSize(new THREE.Vector3());
-        const center = box.getCenter(new THREE.Vector3());
-        model.position.sub(center);
-        const maxDim = Math.max(size.x,size.y,size.z)||1;
-        const scale = 2 / maxDim; if(scale < 1) model.scale.setScalar(scale);
-        scene.add(model);
-        meta.textContent = 'Scenes:'+gltf.scenes.length+' Anim:'+gltf.animations.length;
-      },undefined,err=>{meta.textContent='Error';console.error(err);});
-      function animate(){
-        scene.rotation.y += 0.01;
-        renderer.render(scene,camera);
-        requestAnimationFrame(animate);
-      }
-      animate();
-    }
-    load();
-  </script>
-  </body></html>`;
-}
+// Static client now provided via prebuilt files (index.html, viewer.css, viewer.js)
 
 class AssetViewerServer {
   assets: AssetInfo[] = [];
-  constructor() {
-    this.start();
+  private threeBase: string | null = null;
+  constructor() { this.start(); }
+  async refreshAssets(): Promise<void> { this.assets = await collectAssets(); }
+  private resolveThreeBase(): string | null {
+    if (this.threeBase) return this.threeBase;
+    try {
+      const pkgPath = require.resolve("three/package.json");
+      this.threeBase = join(pkgPath, ".." );
+      return this.threeBase;
+    } catch { return null; }
   }
-
-  async refreshAssets(): Promise<void> {
-    this.assets = await collectAssets();
+  private sendFile(res: ServerResponse, abs: string, contentType?: string): void {
+    if (!existsSync(abs)) { this.notFound(res); return; }
+    if (contentType) res.setHeader("Content-Type", contentType);
+    createReadStream(abs).pipe(res);
   }
-
+  private notFound(res: ServerResponse): void { res.statusCode = 404; res.end("Not found"); }
+  private async handleApiAssets(res: ServerResponse): Promise<void> {
+    await this.refreshAssets();
+    res.setHeader("Content-Type", "application/json; charset=utf-8");
+    res.setHeader("Cache-Control", "no-store");
+    res.end(JSON.stringify(this.assets));
+  }
+  private contentTypeFor(pathname: string): string | undefined {
+    if (pathname.endsWith('.js')) return 'application/javascript; charset=utf-8';
+    if (pathname.endsWith('.css')) return 'text/css; charset=utf-8';
+    if (pathname.endsWith('.html')) return 'text/html; charset=utf-8';
+    if (pathname.endsWith('.json')) return 'application/json; charset=utf-8';
+    if (/[.](png|jpg|jpeg|webp)$/i.test(pathname)) return 'image/' + pathname.split('.').pop();
+    if (/[.](glb)$/i.test(pathname)) return 'model/gltf-binary';
+    if (/[.](gltf)$/i.test(pathname)) return 'model/gltf+json';
+    return undefined;
+  }
   start(): void {
-    Bun.serve({
-      port: PORT,
-      fetch: async (req: Request): Promise<Response> => {
-        const url = new URL(req.url);
-        if (url.pathname === "/api/assets") {
-          await this.refreshAssets();
-          return new Response(JSON.stringify(this.assets), {
-            headers: { "Content-Type": "application/json", "Cache-Control": "no-store" },
-          });
-        }
-        if (url.pathname === "/" || url.pathname === "/index.html") {
-          return new Response(htmlPage(), { headers: { "Content-Type": "text/html; charset=utf-8" } });
-        }
-        // Static assets under /assets
-        if (url.pathname.startsWith("/assets/")) {
-          try {
-            const filePath = join(PUBLIC_DIR, url.pathname);
-            const file = await Bun.file(filePath);
-            if (!(await file.exists())) return new Response("Not found", { status: 404 });
-            return new Response(file);
-          } catch {
-            return new Response("Not found", { status: 404 });
-          }
-        }
-        // Expose node_modules selectively (security: only allow three package)
-        if (url.pathname.startsWith("/node_modules/three/")) {
-          try {
-            const nmPath = join(process.cwd(), url.pathname);
-            const file = await Bun.file(nmPath);
-            if (!(await file.exists())) return new Response("Not found", { status: 404 });
-            // Basic content type inference
-            const headers: Record<string, string> = {};
-            if (nmPath.endsWith(".js")) headers["Content-Type"] = "application/javascript; charset=utf-8";
-            if (nmPath.endsWith(".json")) headers["Content-Type"] = "application/json; charset=utf-8";
-            return new Response(file, { headers });
-          } catch {
-            return new Response("Not found", { status: 404 });
-          }
-        }
-        return new Response("Not found", { status: 404 });
-      },
+    createServer((req: IncomingMessage, res: ServerResponse) => {
+      if (!req.url) return this.notFound(res);
+      const url = new URL(req.url, ORIGIN);
+      const pathname = url.pathname;
+      if (pathname === '/api/assets') { void this.handleApiAssets(res); return; }
+      if (pathname === '/' || pathname === '/index.html') {
+        this.sendFile(res, join(process.cwd(), 'dist', 'client', 'index.html'), 'text/html; charset=utf-8');
+        return;
+      }
+      if (pathname === '/viewer.css') { this.sendFile(res, join(process.cwd(), 'dist', 'client', 'viewer.css'), 'text/css; charset=utf-8'); return; }
+      if (pathname === '/viewer.js') { this.sendFile(res, join(process.cwd(), 'dist', 'client', 'viewer.js'), 'application/javascript; charset=utf-8'); return; }
+      if (pathname.startsWith('/assets/')) {
+        const rel = pathname.substring('/assets/'.length);
+        const abs = join(ASSETS_DIR, rel);
+        this.sendFile(res, abs, this.contentTypeFor(pathname));
+        return;
+      }
+      if (pathname.startsWith('/node_modules/three/')) {
+        const base = this.resolveThreeBase();
+        if (!base) { this.notFound(res); return; }
+        const rel = pathname.substring('/node_modules/three/'.length);
+        const abs = join(base, rel);
+        this.sendFile(res, abs, this.contentTypeFor(pathname));
+        return;
+      }
+      this.notFound(res);
+    }).listen(PORT, HOST, () => {
+      console.log(`🚀 Asset Viewer running: ${ORIGIN}`);
+      console.log(`📁 Serving assets from ${ASSETS_DIR}`);
+      openBrowser(ORIGIN);
     });
-    console.log(`🚀 Asset Viewer running: ${ORIGIN}`);
-    console.log("📁 Serving assets from public/assets");
-    openBrowser(ORIGIN);
   }
 }
 
+function parseCli(): { assetsBaseDir: string; port: number } {
+  const program = new Command();
+  program
+    .name("asset-viewer")
+    .argument("<path>", "Path to assets directory (will look for assets inside it or use it directly if contains models/textures)")
+  .option("-p, --port <number>", "Port to run the server on", (v: string) => Number.parseInt(v, 10))
+    .version(process.env.npm_package_version || "0.0.0")
+    .allowExcessArguments(false)
+    .showHelpAfterError();
+
+  program.parse(process.argv);
+  const opts = program.opts<{ port?: number }>();
+  const rawPath = program.args[0];
+  if (!rawPath) {
+    program.error("Path is required");
+  }
+  const abs = resolve(process.cwd(), rawPath);
+  if (!existsSync(abs)) {
+    program.error(`Provided path does not exist: ${abs}`);
+  }
+  PORT = opts.port && !Number.isNaN(opts.port) ? opts.port : PORT;
+  ORIGIN = `http://${HOST}:${PORT}`;
+
+  // Determine if provided path itself should act as assets directory or contains a public/assets structure.
+  // Accept either: path points directly to the directory containing model/texture files, or path/public/assets.
+  const candidateAssets = abs;
+  const altPublic = join(abs, "public", "assets");
+  if (existsSync(altPublic)) {
+    PUBLIC_DIR = join(abs, "public");
+    ASSETS_DIR = altPublic;
+  } else {
+    PUBLIC_DIR = abs; // serve under /assets by mapping the directory directly
+    ASSETS_DIR = abs;
+  }
+  return { assetsBaseDir: ASSETS_DIR, port: PORT };
+}
+
+parseCli();
 new AssetViewerServer();

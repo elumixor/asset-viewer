@@ -8,17 +8,32 @@ A simple asset viewer for PixiJS and Three.js projects.
 ## Usage
 
 ```bash
-npm install @elumixor/asset-viewer
-npx asset-viewer ./path/to/your/assets
+npm install --save-dev @elumixor/asset-viewer
+
+# Start viewer pointing directly to a directory containing .glb/.gltf/.png/.jpg/.jpeg/.webp files
+npx asset-viewer ./path/to/assets
+
+# Custom port
+npx asset-viewer ./path/to/assets --port 6001
 ```
 
-Then open your browser and navigate to `http://localhost:5735`.
+Open your browser at the printed URL (defaults to `http://localhost:5735`).
+
+The provided path can be either:
+
+1. A folder that directly contains model/texture files (served under `/assets`).
+2. A project root that contains `public/assets` (that subfolder will be used).
 
 Command line options:
 
 ```bash
 Usage: asset-viewer [options] <path>
-    -V, --version        output the version number
     -p, --port <number>  Port to run the server on (default: 5735)
-    -h, --help           display help for command
+    -V, --version        Output version
+    -h, --help           Display help
 ```
+
+Notes:
+
+- The lightweight client (HTML/CSS/JS) is now built separately instead of being inlined.
+- Three.js is resolved from your local `node_modules` when available, with CDN fallback inside the client script.

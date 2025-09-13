@@ -1,7 +1,7 @@
 {
   "compilerOptions": {
-    // Enable latest features
-    "lib": ["ESNext"],
+    // Enable latest features & DOM for client bundle
+    "lib": ["ESNext", "DOM"],
     "target": "ESNext",
     "module": "ESNext",
     "moduleDetection": "force",
@@ -25,5 +25,6 @@
     "noPropertyAccessFromIndexSignature": false,
 
     "outDir": "./dist"
-  }
+  },
+  "exclude": ["test", "dist", "scripts"]
 }

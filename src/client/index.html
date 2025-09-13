@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>HYPO Asset Grid Viewer</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <link rel="stylesheet" href="/viewer.css" />
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "/node_modules/three/build/three.module.js",
+          "three/examples/jsm/loaders/GLTFLoader.js": "/node_modules/three/examples/jsm/loaders/GLTFLoader.js"
+        }
+      }
+    </script>
+  </head>
+  <body>
+    <div class="loading-overlay" id="loading">
+      <div class="spinner"></div>
+      <div>Scanning assets...</div>
+    </div>
+    <h1>HYPO Asset Viewer</h1>
+    <div class="toolbar">
+      <button id="reloadBtn">Reload</button><span id="count"></span>
+    </div>
+    <div id="grid"></div>
+    <footer>Auto-generated viewer • Three.js CDN • HYPO dev tool</footer>
+    <script type="module" src="/viewer.js"></script>
+  </body>
+</html>
