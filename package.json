@@ -1,0 +1,41 @@
+{
+  "name": "@elumixor/asset-viewer",
+  "version": "1.0.1",
+  "description": "A simple asset viewer for PixiJS and Three.js",
+  "main": "dist/asset-viewer-server.js",
+  "types": "dist/asset-viewer-server.d.ts",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/elumixor/asset-viewer.git"
+  },
+  "files": [
+    "./dist"
+  ],
+  "bin": {
+    "asset-viewer": "dist/asset-viewer-server.js"
+  },
+  "scripts": {
+    "build": "bun run build:clean && bun run build:bundle && bun run build:shebang",
+    "build:clean": "rm -rf ./dist",
+    "build:bundle": "bun build ./src/asset-viewer-server.ts --target node --outdir ./dist --minify",
+    "build:shebang": "node ./scripts/add-shebang.js",
+    "check": "tsc --noEmit && bun run lint",
+    "lint": "biome check . --fix",
+    "format": "biome format . --write",
+    "release:patch": "npm version patch -m \"Release v%s\" && git push --tags",
+    "release:minor": "npm version minor -m \"Release v%s\" && git push --tags",
+    "release:major": "npm version major -m \"Release v%s\" && git push --tags"
+  },
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@biomejs/biome": "2.2.4",
+    "@types/bun": "^1.2.21",
+    "@types/three": "^0.180.0",
+    "typescript": "^5"
+  },
+  "peerDependencies": {
+    "pixi.js": "^8.13.2",
+    "three": "^0.180.0"
+  }
+}
