@@ -9,10 +9,10 @@
  */
 
 import { exec } from "node:child_process";
-import { readdir, stat, readFile } from "node:fs/promises";
 import { createReadStream, existsSync } from "node:fs";
+import { readdir, stat } from "node:fs/promises";
+import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { extname, join, resolve } from "node:path";
-import { createServer, IncomingMessage, ServerResponse } from "node:http";
 import { Command } from "commander";
 
 type AssetType = "model" | "texture";
@@ -26,7 +26,7 @@ interface AssetInfo {
 
 // Values will be injected after CLI parsing
 let PORT = 5735;
-let HOST = "localhost";
+const HOST = "localhost";
 let PUBLIC_DIR: string = join(process.cwd(), "public");
 let ASSETS_DIR: string = join(PUBLIC_DIR, "assets");
 let ORIGIN = `http://${HOST}:${PORT}`;
@@ -79,22 +79,34 @@ function openBrowser(url: string): void {
 class AssetViewerServer {
   assets: AssetInfo[] = [];
   private threeBase: string | null = null;
-  constructor() { this.start(); }
-  async refreshAssets(): Promise<void> { this.assets = await collectAssets(); }
+  constructor() {
+    this.start();
+  }
+  async refreshAssets(): Promise<void> {
+    this.assets = await collectAssets();
+  }
   private resolveThreeBase(): string | null {
     if (this.threeBase) return this.threeBase;
     try {
       const pkgPath = require.resolve("three/package.json");
-      this.threeBase = join(pkgPath, ".." );
+      this.threeBase = join(pkgPath, "..");
       return this.threeBase;
-    } catch { return null; }
+    } catch {
+      return null;
+    }
   }
   private sendFile(res: ServerResponse, abs: string, contentType?: string): void {
-    if (!existsSync(abs)) { this.notFound(res); return; }
+    if (!existsSync(abs)) {
+      this.notFound(res);
+      return;
+    }
     if (contentType) res.setHeader("Content-Type", contentType);
     createReadStream(abs).pipe(res);
   }
-  private notFound(res: ServerResponse): void { res.statusCode = 404; res.end("Not found"); }
+  private notFound(res: ServerResponse): void {
+    res.statusCode = 404;
+    res.end("Not found");
+  }
   private async handleApiAssets(res: ServerResponse): Promise<void> {
     await this.refreshAssets();
     res.setHeader("Content-Type", "application/json; charset=utf-8");
@@ -102,13 +114,13 @@ class AssetViewerServer {
     res.end(JSON.stringify(this.assets));
   }
   private contentTypeFor(pathname: string): string | undefined {
-    if (pathname.endsWith('.js')) return 'application/javascript; charset=utf-8';
-    if (pathname.endsWith('.css')) return 'text/css; charset=utf-8';
-    if (pathname.endsWith('.html')) return 'text/html; charset=utf-8';
-    if (pathname.endsWith('.json')) return 'application/json; charset=utf-8';
-    if (/[.](png|jpg|jpeg|webp)$/i.test(pathname)) return 'image/' + pathname.split('.').pop();
-    if (/[.](glb)$/i.test(pathname)) return 'model/gltf-binary';
-    if (/[.](gltf)$/i.test(pathname)) return 'model/gltf+json';
+    if (pathname.endsWith(".js")) return "application/javascript; charset=utf-8";
+    if (pathname.endsWith(".css")) return "text/css; charset=utf-8";
+    if (pathname.endsWith(".html")) return "text/html; charset=utf-8";
+    if (pathname.endsWith(".json")) return "application/json; charset=utf-8";
+    if (/[.](png|jpg|jpeg|webp)$/i.test(pathname)) return `image/${pathname.split(".").pop()}`;
+    if (/[.](glb)$/i.test(pathname)) return "model/gltf-binary";
+    if (/[.](gltf)$/i.test(pathname)) return "model/gltf+json";
     return undefined;
   }
   start(): void {
@@ -116,23 +128,35 @@ class AssetViewerServer {
       if (!req.url) return this.notFound(res);
       const url = new URL(req.url, ORIGIN);
       const pathname = url.pathname;
-      if (pathname === '/api/assets') { void this.handleApiAssets(res); return; }
-      if (pathname === '/' || pathname === '/index.html') {
-        this.sendFile(res, join(process.cwd(), 'dist', 'client', 'index.html'), 'text/html; charset=utf-8');
+      if (pathname === "/api/assets") {
+        void this.handleApiAssets(res);
         return;
       }
-      if (pathname === '/viewer.css') { this.sendFile(res, join(process.cwd(), 'dist', 'client', 'viewer.css'), 'text/css; charset=utf-8'); return; }
-      if (pathname === '/viewer.js') { this.sendFile(res, join(process.cwd(), 'dist', 'client', 'viewer.js'), 'application/javascript; charset=utf-8'); return; }
-      if (pathname.startsWith('/assets/')) {
-        const rel = pathname.substring('/assets/'.length);
+      if (pathname === "/" || pathname === "/index.html") {
+        this.sendFile(res, join(process.cwd(), "dist", "client", "index.html"), "text/html; charset=utf-8");
+        return;
+      }
+      if (pathname === "/viewer.css") {
+        this.sendFile(res, join(process.cwd(), "dist", "client", "viewer.css"), "text/css; charset=utf-8");
+        return;
+      }
+      if (pathname === "/viewer.js") {
+        this.sendFile(res, join(process.cwd(), "dist", "client", "viewer.js"), "application/javascript; charset=utf-8");
+        return;
+      }
+      if (pathname.startsWith("/assets/")) {
+        const rel = pathname.substring("/assets/".length);
         const abs = join(ASSETS_DIR, rel);
         this.sendFile(res, abs, this.contentTypeFor(pathname));
         return;
       }
-      if (pathname.startsWith('/node_modules/three/')) {
+      if (pathname.startsWith("/node_modules/three/")) {
         const base = this.resolveThreeBase();
-        if (!base) { this.notFound(res); return; }
-        const rel = pathname.substring('/node_modules/three/'.length);
+        if (!base) {
+          this.notFound(res);
+          return;
+        }
+        const rel = pathname.substring("/node_modules/three/".length);
         const abs = join(base, rel);
         this.sendFile(res, abs, this.contentTypeFor(pathname));
         return;
@@ -150,8 +174,11 @@ function parseCli(): { assetsBaseDir: string; port: number } {
   const program = new Command();
   program
     .name("asset-viewer")
-    .argument("<path>", "Path to assets directory (will look for assets inside it or use it directly if contains models/textures)")
-  .option("-p, --port <number>", "Port to run the server on", (v: string) => Number.parseInt(v, 10))
+    .argument(
+      "<path>",
+      "Path to assets directory (will look for assets inside it or use it directly if contains models/textures)",
+    )
+    .option("-p, --port <number>", "Port to run the server on", (v: string) => Number.parseInt(v, 10))
     .version(process.env.npm_package_version || "0.0.0")
     .allowExcessArguments(false)
     .showHelpAfterError();
@@ -171,7 +198,7 @@ function parseCli(): { assetsBaseDir: string; port: number } {
 
   // Determine if provided path itself should act as assets directory or contains a public/assets structure.
   // Accept either: path points directly to the directory containing model/texture files, or path/public/assets.
-  const candidateAssets = abs;
+  const _candidateAssets = abs;
   const altPublic = join(abs, "public", "assets");
   if (existsSync(altPublic)) {
     PUBLIC_DIR = join(abs, "public");
