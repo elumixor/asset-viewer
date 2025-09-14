@@ -24,6 +24,7 @@
     "noUnusedParameters": false,
     "noPropertyAccessFromIndexSignature": false,
 
+    "baseUrl": "./src",
     "outDir": "./dist"
   },
   "exclude": ["test", "dist", "scripts"]

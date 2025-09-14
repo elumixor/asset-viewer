@@ -1,0 +1,6 @@
+@import "tailwindcss";
+
+/* Keep canvas display block to avoid inline gap issues */
+canvas {
+  display: block;
+}
