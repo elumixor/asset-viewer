@@ -34,10 +34,6 @@
   "author": "elumixor",
   "license": "ISC",
   "devDependencies": {
-    "@pixi/react": "^8.0.0",
-    "pixi.js": "^8.8.1",
-    "react": "^19.0.0",
-    "react-dom": "^19.0.0",
     "@biomejs/biome": "2.2.4",
     "@elumixor/thrixi-resources": "^1.0.6",
     "@tailwindcss/vite": "^4.1.13",
@@ -49,10 +45,13 @@
     "commander": "^12.1.0",
     "concurrently": "^8.2.2",
     "hono": "^4.9.7",
+    "pixi.js": "^8.8.1",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
     "tailwindcss": "^4.1.13",
     "three": "^0.180.0",
-    "vite": "^6.2.0",
     "typescript": "~5.7.3",
+    "vite": "^6.2.0",
     "vite-plugin-singlefile": "^2.3.0"
   }
 }

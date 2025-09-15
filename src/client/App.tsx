@@ -1,7 +1,5 @@
 import { Resources } from "@elumixor/thrixi-resources";
 import type { SupportedFileName } from "@elumixor/thrixi-resources/dist/types";
-import { extend } from "@pixi/react";
-import { Container, Graphics, Sprite } from "pixi.js";
 import type React from "react";
 import { useEffect, useState } from "react";
 import { AssetCard } from "./components/AssetCard";
@@ -9,13 +7,6 @@ import { ResourcesProvider } from "./contexts/resources";
 import "./global.css";
 import { getFileNameWithoutExtension } from "./lib";
 import { useAssetList } from "./services/asset-list";
-
-// Extend Pixi with React components
-extend({
-  Container,
-  Graphics,
-  Sprite,
-});
 
 export const App: React.FC = () => {
   const [resources, setResources] = useState(new Resources("/assets"));
@@ -42,7 +33,9 @@ export const App: React.FC = () => {
   return (
     <ResourcesProvider basePath="/assets">
       <header>
-        <h1 className="text-[1.6rem] bg-gradient-to-r from-[#4ec9ff] to-[#66ccff] bg-clip-text text-transparent font-semibold mb-2">Asset Viewer</h1>
+        <h1 className="text-[1.6rem] bg-gradient-to-r from-[#4ec9ff] to-[#66ccff] bg-clip-text text-transparent font-semibold mb-2">
+          Asset Viewer
+        </h1>
         <div className="flex gap-3 items-center mt-3 flex-wrap">
           <button
             type="button"
