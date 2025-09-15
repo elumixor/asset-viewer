@@ -1,6 +1,6 @@
 {
   "name": "@elumixor/asset-viewer",
-  "version": "2.0.1",
+  "version": "2.0.2",
   "description": "A simple asset viewer for PixiJS and Three.js",
   "main": "dist/server/index.js",
   "type": "module",
