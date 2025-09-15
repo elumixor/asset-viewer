@@ -11,7 +11,7 @@ export function parseArgs(): { assetsBaseDir: string; port: number; open: boolea
       "Path to assets directory (or set ASSET_VIEWER_PATH env var). If a project root containing public/assets is provided, that subfolder will be used.",
     )
     .option("-p, --port <number>", "Port to run the server on", "5735")
-    .option("-o, --open", "Open default browser pointing to the server root after start", false)
+    .option("-o, --open", "Open default browser pointing to the server root after start", true)
     .version(process.env.npm_package_version || "0.0.0")
     .allowExcessArguments(false)
     .showHelpAfterError();

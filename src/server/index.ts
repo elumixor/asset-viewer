@@ -1,40 +1,31 @@
-import { spawn } from "node:child_process";
+// NOTE: Avoid relying on __dirname because Bun's bundler can bake it at build time.
+// Using import.meta.url ensures the path is resolved relative to the final compiled file.
+
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { Hono } from "hono";
 import { serveStatic } from "hono/bun";
 import { cors } from "hono/cors";
 import { getAssetsList } from "./get-assets-list";
+import { openBrowser } from "./open-browser";
 import { parseArgs } from "./parse-args";
 
 const { port, assetsBaseDir, open } = parseArgs();
 
+// Determine the path to the built client directory relative to the compiled server file.
+// Compiled layout assumption: dist/server/index.js (this file) & dist/client/* (static assets)
+// new URL("../client", import.meta.url) -> dist/client
+const __filename = fileURLToPath(import.meta.url);
+const __dir = dirname(__filename);
+const clientRoot = resolve(__dir, "../client");
+
 console.log(`Serving assets from: ${assetsBaseDir}`);
 console.log(`Server running on port: ${port}`);
-const url = `http://localhost:${port}`;
-if (open) {
-  // Defer opening slightly to ensure server is ready
-  setTimeout(() => {
-    try {
-      const platform = process.platform;
-      let cmd: string;
-      let args: string[] = [];
-      if (platform === "darwin") {
-        cmd = "open";
-        args = [url];
-      } else if (platform === "win32") {
-        cmd = "cmd";
-        args = ["/c", "start", "", url];
-      } else {
-        cmd = "xdg-open";
-        args = [url];
-      }
-      const child = spawn(cmd, args, { stdio: "ignore", detached: true });
-      child.unref();
-      console.log(`Opened browser at ${url}`);
-    } catch (err) {
-      console.warn(`Failed to open browser automatically: ${err}`);
-    }
-  }, 150);
-}
+console.log(`Serving client from: ${clientRoot}`);
+export const url = `http://localhost:${port}`;
+
+// Defer opening slightly to ensure server is ready
+if (open) setTimeout(() => openBrowser(), 150);
 
 const app = new Hono()
   .use(
@@ -53,7 +44,7 @@ const app = new Hono()
     }),
   )
   // Serve the built client on the root path (single HTML file)
-  .get("/", serveStatic({ root: "./dist/client" }))
+  .get("/", serveStatic({ root: clientRoot }))
   // Serve the list of assets as JSON
   .get("/asset-list", async (c) => {
     let assets = await getAssetsList(assetsBaseDir);
