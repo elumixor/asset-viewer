@@ -14,32 +14,52 @@ function withTempAssetsDir(run: (dir: string) => void) {
   }
 }
 
-test("parseArgs: open flag default is false", () => {
+test("parseArgs: open flag default is true", () => {
   withTempAssetsDir((dir) => {
     const old = process.argv;
     process.argv = [old[0], old[1], dir];
     const { open } = parseArgs();
-    process.argv = old; // restore
-    expect(open).toBe(false);
-  });
-});
-
-test("parseArgs: --open sets open true", () => {
-  withTempAssetsDir((dir) => {
-    const old = process.argv;
-    process.argv = [old[0], old[1], dir, "--open"]; // pass flag
-    const { open } = parseArgs();
-    process.argv = old; // restore
+    process.argv = old;
     expect(open).toBe(true);
   });
 });
 
-test("parseArgs: -o sets open true", () => {
+test("parseArgs: --open false disables opening", () => {
   withTempAssetsDir((dir) => {
     const old = process.argv;
-    process.argv = [old[0], old[1], dir, "-o"]; // pass short flag
+    process.argv = [old[0], old[1], dir, "--open", "false"];
     const { open } = parseArgs();
-    process.argv = old; // restore
+    process.argv = old;
+    expect(open).toBe(false);
+  });
+});
+
+test("parseArgs: --open=false disables opening", () => {
+  withTempAssetsDir((dir) => {
+    const old = process.argv;
+    process.argv = [old[0], old[1], dir, "--open=false"];
+    const { open } = parseArgs();
+    process.argv = old;
+    expect(open).toBe(false);
+  });
+});
+
+test("parseArgs: -o false disables opening", () => {
+  withTempAssetsDir((dir) => {
+    const old = process.argv;
+    process.argv = [old[0], old[1], dir, "-o", "false"];
+    const { open } = parseArgs();
+    process.argv = old;
+    expect(open).toBe(false);
+  });
+});
+
+test("parseArgs: -o true explicit true", () => {
+  withTempAssetsDir((dir) => {
+    const old = process.argv;
+    process.argv = [old[0], old[1], dir, "-o", "true"];
+    const { open } = parseArgs();
+    process.argv = old;
     expect(open).toBe(true);
   });
 });
