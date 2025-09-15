@@ -1,16 +1,16 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import type { GLTF } from "three/examples/jsm/loaders/GLTFLoader.js";
 import {
-  Scene as ThreeScene,
-  Color as ThreeColor,
-  PerspectiveCamera,
-  WebGLRenderer,
   AmbientLight,
+  Box3,
   DirectionalLight,
   GridHelper,
-  Box3,
+  PerspectiveCamera,
+  Color as ThreeColor,
+  Scene as ThreeScene,
   Vector3,
+  WebGLRenderer,
 } from "three";
+import type { GLTF } from "three/examples/jsm/loaders/GLTFLoader.js";
 
 export function AssetViewer3D({ gltf, onMeta }: { gltf: GLTF; onMeta: (meta: string) => void }) {
   const wrapperRef = useRef<HTMLDivElement | null>(null);

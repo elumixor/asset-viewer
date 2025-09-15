@@ -1,13 +1,40 @@
+import { spawn } from "node:child_process";
 import { Hono } from "hono";
 import { serveStatic } from "hono/bun";
 import { cors } from "hono/cors";
 import { getAssetsList } from "./get-assets-list";
 import { parseArgs } from "./parse-args";
 
-const { port, assetsBaseDir } = parseArgs();
+const { port, assetsBaseDir, open } = parseArgs();
 
 console.log(`Serving assets from: ${assetsBaseDir}`);
 console.log(`Server running on port: ${port}`);
+const url = `http://localhost:${port}`;
+if (open) {
+  // Defer opening slightly to ensure server is ready
+  setTimeout(() => {
+    try {
+      const platform = process.platform;
+      let cmd: string;
+      let args: string[] = [];
+      if (platform === "darwin") {
+        cmd = "open";
+        args = [url];
+      } else if (platform === "win32") {
+        cmd = "cmd";
+        args = ["/c", "start", "", url];
+      } else {
+        cmd = "xdg-open";
+        args = [url];
+      }
+      const child = spawn(cmd, args, { stdio: "ignore", detached: true });
+      child.unref();
+      console.log(`Opened browser at ${url}`);
+    } catch (err) {
+      console.warn(`Failed to open browser automatically: ${err}`);
+    }
+  }, 150);
+}
 
 const app = new Hono()
   .use(

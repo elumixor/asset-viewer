@@ -15,6 +15,9 @@ npx asset-viewer ./path/to/assets
 
 # Custom port
 npx asset-viewer ./path/to/assets --port 6001
+
+# Auto-open in browser
+npx asset-viewer ./path/to/assets --open
 ```
 
 Open your browser at the printed URL (defaults to `http://localhost:5735`).
@@ -29,6 +32,7 @@ Command line options:
 ```bash
 Usage: asset-viewer [options] <path>
     -p, --port <number>  Port to run the server on (default: 5735)
+    -o, --open           Open default browser pointing to server root after start
     -V, --version        Output version
     -h, --help           Display help
 ```
