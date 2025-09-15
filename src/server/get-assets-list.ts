@@ -1,5 +1,6 @@
 import { readdir } from "node:fs/promises";
 import { join } from "node:path";
+import { supportedExtensions } from "shared";
 
 // Recursively walk through the directory and collect all files
 export async function getAssetsList(currentDir: string): Promise<string[]> {
@@ -10,5 +11,10 @@ export async function getAssetsList(currentDir: string): Promise<string[]> {
       else if (entry.isFile()) return [fullPath];
       else return [];
     }),
-  ).then((lists) => lists.flat());
+  ).then((lists) =>
+    lists.flat().filter((p) => {
+      const extension = p.slice(p.lastIndexOf(".")).toLowerCase();
+      return (supportedExtensions as string[]).includes(extension);
+    }),
+  );
 }

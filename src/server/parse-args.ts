@@ -22,7 +22,7 @@ export function parseArgs(): { assetsBaseDir: string; port: number; open: boolea
     .option(
       "-o, --open [value]",
       "Open default browser pointing to the server root after start (pass false to disable)",
-      (value: string, previous: boolean | undefined) => {
+      (value: string) => {
         // Commander passes value when provided, otherwise undefined if just flag
         try {
           return parseBoolean(value);
